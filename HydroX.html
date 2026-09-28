@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Campus Hub — Attendance Predictor + Free Class Locator</title>
+<style>
+/* ===== Shared shell ===== */
+:root{--hub:58px;color-scheme:light dark}
+html{scroll-behavior:smooth}
+body{margin:0;background:#f5f7fb;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+[hidden]{display:none!important}
+.hub{position:sticky;top:0;z-index:100;height:var(--hub);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 20px;background:#fff;border-bottom:1px solid #e7ebf3;color:#172033}
+.hub-brand{font-weight:850;font-size:16px;display:flex;align-items:center;gap:9px}
+.hub-logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#7068ff,#5149dc);color:#fff;display:grid;place-items:center;font-weight:900}
+.hub-tabs{display:inline-flex;border:2px solid #635bff;border-radius:11px;overflow:hidden}
+.hub-tabs button{border:0;padding:0 16px;height:38px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;background:#fff;color:#172033}
+.hub-tabs button[aria-selected="true"]{background:#635bff;color:#fff}
+.hub-tabs button:focus-visible{outline:3px solid #635bff;outline-offset:-3px}
+@media(max-width:560px){.hub-brand span{display:none}.hub{padding:0 10px}}
+@media(prefers-color-scheme:dark){.hub{background:#171e2e;color:#e8edf7;border-color:#28324a}.hub-tabs button{background:#171e2e;color:#e8edf7}.hub-tabs button[aria-selected="true"]{background:#635bff;color:#fff}}
+
+/* ===== Attendance Predictor (scoped to #A) ===== */
+@scope (#A){
+:scope{
+  --bg:#f5f7fb;--surface:#fff;--surface2:#f8faff;--text:#172033;--muted:#718096;
+  --primary:#635bff;--primary2:#5048dc;--green:#12a875;--orange:#e59a18;--red:#e5484d;
+  --blue:#3182ce;--border:#e7ebf3;--shadow:0 10px 30px rgba(23,32,51,.07);--radius:18px;
+  min-height:calc(100vh - var(--hub));
+  background:radial-gradient(circle at 10% 0%,rgba(99,91,255,.07),transparent 28%),radial-gradient(circle at 90% 5%,rgba(49,130,206,.06),transparent 25%),var(--bg);
+  color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.5}
+*{box-sizing:border-box}
+button,input,select{font:inherit}button{cursor:pointer}
+.topbar{position:sticky;top:var(--hub);z-index:50;height:68px;background:rgba(255,255,255,.9);backdrop-filter:blur(18px);border-bottom:1px solid var(--border)}
+.topbar-inner{max-width:1200px;height:100%;margin:auto;padding:0 20px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:11px;align-items:center}.brand-icon{width:39px;height:39px;border-radius:12px;background:linear-gradient(135deg,#7068ff,#5149dc);color:#fff;display:grid;place-items:center;font-weight:900}
+.brand-name{font-weight:850;font-size:17px}.brand-sub{font-size:10px;color:var(--muted)}
+.live{border:1px solid var(--border);padding:7px 12px;border-radius:999px;font-size:11px;color:var(--muted)}
+.live i{display:inline-block;width:7px;height:7px;background:#22c55e;border-radius:50%;margin-right:6px}
+main{max-width:1200px;margin:auto;padding:30px 20px 80px}
+.hero{display:flex;justify-content:space-between;gap:25px;align-items:end;margin-bottom:22px}
+.badge{display:inline-block;padding:7px 11px;background:#eeecff;color:var(--primary);border-radius:999px;font-size:11px;font-weight:800}
+h1{font-size:clamp(30px,5vw,48px);line-height:1.05;letter-spacing:-.045em;margin:11px 0 8px}
+h1 span{color:var(--primary)}.hero p{color:var(--muted);max-width:690px;margin:0;font-size:14px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:18px}
+.controls{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:13px}.field label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 6px 2px}
+input,select{width:100%;height:45px;border:1px solid var(--border);border-radius:11px;background:#fafbfe;padding:0 12px;color:var(--text);font-weight:600}
+input:focus,select:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 4px rgba(99,91,255,.1)}
+.check{margin-top:12px;background:var(--surface2);border:1px solid var(--border);padding:10px 12px;border-radius:11px;font-size:12px;color:var(--muted)}
+.check input{width:auto;height:auto;margin-right:7px}
+.overview{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:14px;margin-bottom:24px}
+.ov{background:#fff;border:1px solid var(--border);border-radius:17px;padding:18px;box-shadow:0 2px 8px rgba(23,32,51,.05)}
+.ov.primary{background:linear-gradient(135deg,#6159f6,#5149dc);color:#fff;border:0}.ov small{display:block;font-size:11px;opacity:.7}.ov strong{display:block;font-size:29px;margin-top:2px;letter-spacing:-.04em}.ov p{font-size:11px;color:var(--muted);margin:3px 0 0}.primary p{color:rgba(255,255,255,.75)}
+.progress{height:6px;background:rgba(255,255,255,.2);border-radius:10px;margin-top:12px;overflow:hidden}.progress span{display:block;height:100%;background:#fff;border-radius:10px}
+.section-title{display:flex;justify-content:space-between;align-items:end;margin:27px 0 12px}.section-title h2{margin:0;font-size:20px;letter-spacing:-.03em}.section-title p{margin:3px 0 0;color:var(--muted);font-size:11px}
+.input-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.subject-input{padding:13px;border:1px solid var(--border);border-radius:13px;background:#fbfcfe}.subject-input label{display:block;font-size:11px;font-weight:750;min-height:34px;color:#4d5a72}.subject-input input{height:40px;background:#fff}
+.alert{display:none;margin:17px 0;padding:16px;border-radius:14px;background:#fff0f1;border:1px solid #ffd0d2;color:#a51d25}.alert strong{font-size:14px}.alert small{display:block;margin-top:4px}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}.card{background:#fff;border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 2px 8px rgba(23,32,51,.05)}
+.card.bad{border-color:#ffd1d3}.card-head{display:flex;justify-content:space-between;gap:10px}.card h3{font-size:15px;margin:0;line-height:1.25}.code{width:33px;height:33px;border-radius:9px;background:#eeecff;color:var(--primary);display:grid;place-items:center;font-size:11px;font-weight:850}
+.tag{display:inline-block;margin-top:7px;padding:4px 8px;border-radius:7px;font-size:9px;font-weight:850}
+.meter{display:flex;gap:15px;align-items:center;margin:18px 0}.circle{width:70px;height:70px;border-radius:50%;display:grid;place-items:center;position:relative;flex:none}.circle:before{content:"";position:absolute;inset:6px;background:#fff;border-radius:50%}.circle b{position:relative;font-size:16px}.track{height:8px;background:#edf0f6;border-radius:20px;position:relative;margin-top:7px}.fill{height:100%;border-radius:20px}.threshold{position:absolute;top:-4px;width:2px;height:16px;background:#39445b}.t75{left:75%}.t90{left:90%}
+.meter-info{flex:1}.meter-info small{display:flex;justify-content:space-between;color:var(--muted);font-size:10px}
+.details{display:grid;grid-template-columns:1fr 1fr;gap:7px}.detail{background:#fafbfe;border:1px solid #edf0f5;border-radius:10px;padding:8px 9px}.detail span{display:block;font-size:9px;color:var(--muted)}.detail b{font-size:11px}
+.plan{margin-top:10px;padding:10px;border-radius:11px;background:#eaf4ff;color:#23649c;font-size:10px}
+.analytics{display:grid;grid-template-columns:1fr 1fr;gap:15px}.chart{background:#fff;border:1px solid var(--border);border-radius:18px;padding:18px}.chart h3{margin:0;font-size:14px}.chart-sub{color:var(--muted);font-size:10px;margin:2px 0 15px}
+.bar-row{display:grid;grid-template-columns:145px 1fr 42px;gap:8px;align-items:center;margin:10px 0;font-size:10px}.bar{height:10px;background:#edf0f6;border-radius:20px;overflow:hidden}.bar i{display:block;height:100%;border-radius:20px}.donut-wrap{display:flex;align-items:center;gap:25px}.donut{width:140px;height:140px;border-radius:50%;background:conic-gradient(var(--green) 0 0,var(--orange) 0 0,var(--red) 0 0,#edf0f6 0);position:relative}.donut:after{content:"";position:absolute;inset:28px;background:#fff;border-radius:50%}.legend2{font-size:11px;color:var(--muted)}.legend2 div{margin:8px 0}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.simulator{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end}.btn{height:45px;border:0;border-radius:11px;background:var(--primary);color:#fff;font-weight:800;padding:0 16px}.btn.secondary{background:#eef0ff;color:var(--primary)}
+.sim-result{margin-top:13px;padding:12px;border-radius:12px;background:#f8faff;border:1px solid var(--border);font-size:12px;display:none}
+.chat-fab{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border:0;border-radius:50%;background:linear-gradient(135deg,#7068ff,#5149dc);color:#fff;font-size:23px;box-shadow:0 14px 30px rgba(99,91,255,.35);z-index:80}
+.chat{display:none;position:fixed;right:22px;bottom:91px;width:min(380px,calc(100vw - 30px));height:510px;background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 20px 55px rgba(23,32,51,.18);z-index:79;overflow:hidden}
+.chat.open{display:flex;flex-direction:column}.chat-head{padding:14px 16px;background:#6159f6;color:#fff;display:flex;justify-content:space-between}.chat-head strong{font-size:13px}.chat-head small{display:block;opacity:.75;font-size:9px}.chat-close{border:0;background:transparent;color:#fff;font-size:20px}.messages{flex:1;padding:13px;overflow:auto;background:#f8faff}.msg{max-width:85%;padding:9px 11px;border-radius:12px;font-size:11px;margin:7px 0}.bot{background:#fff;border:1px solid var(--border)}.user{background:#6159f6;color:#fff;margin-left:auto}.chat-input{display:flex;gap:7px;padding:10px;border-top:1px solid var(--border)}.chat-input input{height:40px}.chat-input button{height:40px;padding:0 13px}
+.note{margin-top:22px;padding:14px 17px;border-radius:13px;background:#f9fafc;border:1px solid var(--border);color:var(--muted);font-size:10px;line-height:1.7}
+footer{text-align:center;color:#98a2b3;font-size:10px;padding:0 20px 30px}
+@media(max-width:900px){.controls,.simulator{grid-template-columns:1fr 1fr}.overview{grid-template-columns:1fr 1fr}.ov.primary{grid-column:1/-1}.input-grid{grid-template-columns:repeat(2,1fr)}.analytics{grid-template-columns:1fr}}
+@media(max-width:680px){.hero{display:block}.controls,.simulator,.overview,.input-grid,.cards{grid-template-columns:1fr}.ov.primary{grid-column:auto}.hero h1{font-size:35px}.topbar{height:62px}.brand-sub{display:none}.bar-row{grid-template-columns:105px 1fr 35px}}
+}
+
+/* ===== Free Class Locator (scoped to #L) ===== */
+@scope (#L){
+:scope{--bg:#f3f5f2;--ink:#14231e;--mute:#5d6b65;--card:#fff;--line:#d7ded9;--free:#1f8a5b;--busy:#c2452d;--soon:#c98a12;--acc:#0e3b2e;
+  min-height:calc(100vh - var(--hub));background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:scope{--bg:#0f1815;--ink:#e6efe9;--mute:#93a39a;--card:#16231f;--line:#2a3b35;--free:#4cc38a;--busy:#ef7a63;--soon:#e6b34a;--acc:#4cc38a}}
+*{box-sizing:border-box}
+header{padding:28px 5vw 8px}h1{font:700 2rem/1.1 Georgia,serif;margin:0 0 4px}header p{margin:0;color:var(--mute)}
+main{padding:12px 5vw 60px;max-width:1100px;margin:auto}
+.ask{display:flex;gap:8px;margin:16px 0 8px}
+.ask input{flex:1;padding:14px 16px;font-size:1rem;border:2px solid var(--acc);border-radius:10px;background:var(--card);color:var(--ink)}
+button{padding:0 20px;border:0;border-radius:10px;background:var(--acc);color:var(--bg);font-weight:600;cursor:pointer;min-height:44px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}.chips button{background:var(--card);color:var(--ink);border:1px solid var(--line);font-weight:400;padding:4px 12px;min-height:32px;border-radius:99px;font-size:.85rem}
+.result{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--acc);border-radius:10px;padding:14px 16px;margin-bottom:18px}
+.result h2{margin:0 0 8px;font-size:1rem}.result .none{color:var(--busy)}
+.pill{display:inline-block;margin:0 6px 6px 0;padding:6px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:8px 0 18px}
+label{font-size:.8rem;color:var(--mute);display:flex;flex-direction:column;gap:3px}
+select,input[type=time]{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:.95rem}
+.floor{margin-bottom:20px}.floor h3{margin:0 0 8px;font-size:1.05rem;border-bottom:1px solid var(--line);padding-bottom:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.room{background:var(--card);border:1px solid var(--line);border-top:5px solid var(--free);border-radius:10px;padding:10px 12px}
+.room.busy{border-top-color:var(--busy)}.room.soon{border-top-color:var(--soon)}
+.room b{display:block;font-size:1.05rem}.room small{color:var(--mute);display:block}
+.room .st{margin-top:6px;font-size:.85rem;font-weight:600}.free .st,.room:not(.busy):not(.soon) .st{color:var(--free)}.busy .st{color:var(--busy)}.soon .st{color:var(--soon)}
+.sum{margin:0 0 14px;font-weight:600}.sum b{color:var(--free);font-size:1.15rem}.sum .none{color:var(--busy)}
+.tl{position:relative;height:8px;border-radius:4px;background:color-mix(in srgb,var(--free) 30%,transparent);margin-top:8px;overflow:hidden}
+.tl u{position:absolute;top:0;bottom:0;background:var(--busy)}.tl s{position:absolute;top:0;bottom:0;width:2px;background:var(--ink)}
+.room{cursor:pointer}.room.dim{opacity:.25}.room.hit{outline:3px solid var(--acc)}
+.room .det{display:none;margin-top:8px;font-size:.78rem;color:var(--mute);border-top:1px dashed var(--line);padding-top:6px}.room.open .det{display:block}
+.note{font-size:.8rem;color:var(--mute);margin-top:24px}
+.mapwrap{display:grid;grid-template-columns:1fr 300px;gap:16px;margin-bottom:24px}
+@media(max-width:800px){.mapwrap{grid-template-columns:1fr}}
+.stage{position:relative;height:560px;border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden;perspective:1400px}
+.stage .tools button{min-height:34px;padding:0 12px;font-size:.85rem}
+.stage .tools{position:absolute;left:12px;bottom:10px;flex-wrap:wrap;z-index:2;display:flex;gap:10px;align-items:center;font-size:.78rem;color:var(--mute)}
+.stage .legend{position:absolute;right:12px;top:10px;z-index:2;font-size:.78rem;color:var(--mute);display:flex;gap:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+#bld{position:absolute;left:50%;top:50%;width:490px;height:100px;margin:-50px 0 0 -245px;transform-style:preserve-3d}
+.slab{position:absolute;inset:0;transform-style:preserve-3d;border:1px solid var(--line);border-radius:8px;background:var(--bg);display:flex;gap:10px;padding:24px 8px 6px;transition:transform .5s}
+.slab .fl{position:absolute;left:8px;right:8px;top:2px;font:600 13px Georgia,serif;border-bottom:1px solid var(--line);padding-bottom:1px}
+.t{--c:var(--free);position:relative;flex:1;min-width:0;background:var(--card);color:var(--ink);border:1px solid var(--line);border-top:5px solid var(--c);border-radius:6px;padding:4px 8px;transform-style:preserve-3d;transform:translateZ(14px);cursor:pointer;display:flex;flex-direction:column;justify-content:center;font-size:11px;transition:filter .2s}
+.t.soon{--c:var(--soon)}.t.busy{--c:var(--busy)}
+.t b{font-size:13px}.t small{color:var(--mute);font-size:10px}
+.t .st{font-weight:600;color:var(--c);margin-top:1px}.t .tl{height:6px;margin-top:4px}
+.t::before,.t::after{content:"";position:absolute;background:var(--c);filter:brightness(.75)}
+.t::before{left:0;right:0;top:100%;height:14px;transform-origin:top;transform:rotateX(-90deg)}
+.t::after{top:0;bottom:0;left:100%;width:14px;transform-origin:left;transform:rotateY(90deg)}
+.t:hover{filter:brightness(1.08)}.t.sel{box-shadow:0 0 0 3px var(--acc)}
+.t.dim{opacity:.3}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;align-self:start}
+.panel h2{margin:0;font:700 1.4rem Georgia,serif}.panel .sub{color:var(--mute);font-size:.85rem}
+.cd{font:700 2.6rem/1.1 "Consolas","Courier New",monospace;margin:12px 0 2px;font-variant-numeric:tabular-nums}
+.cd.free{color:var(--free)}.cd.soon{color:var(--soon)}.cd.busy{color:var(--busy)}
+.cdl{color:var(--mute);font-size:.85rem;margin-bottom:12px}
+.acts{display:flex;flex-direction:column;gap:8px}
+.wa{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:10px;background:#25d366;color:#062b12;font-weight:700;text-decoration:none}
+.empty{color:var(--mute)}
+.chips button[aria-pressed=true]{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.seg{display:inline-flex;border:2px solid var(--acc);border-radius:10px;overflow:hidden;margin:0 0 14px}
+.seg button{border-radius:0;background:var(--card);color:var(--ink);min-height:40px;padding:0 18px}
+.seg button[aria-pressed=true]{background:var(--acc);color:var(--bg)}
+button:focus-visible,.wa:focus-visible,.t:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+}
+</style>
+</head>
+<body>
+
+<div class="hub">
+  <div class="hub-brand"><div class="hub-logo">✓</div><span>Campus Hub</span></div>
+  <div class="hub-tabs" role="tablist" aria-label="Choose tool">
+    <button role="tab" data-t="A" aria-selected="true">📊 Attendance Predictor</button>
+    <button role="tab" data-t="L" aria-selected="false">🗺️ Free Class Locator</button>
+  </div>
+</div>
+
+<!-- ================= ATTENDANCE PREDICTOR ================= -->
+<div id="A">
+<header class="topbar"><div class="topbar-inner">
+  <div class="brand"><div class="brand-icon">✓</div><div><div class="brand-name">Attendance Predictor</div><div class="brand-sub">Smart attendance planning</div></div></div>
+  <div class="live"><i></i> Live calculator</div>
+</div></header>
+
+<main>
+<section class="hero">
+  <div><span class="badge">Academic Semester 2026</span>
+  <h1>Know where you stand.<br><span>Plan what comes next.</span></h1>
+  <p>Use your section timetable and current attendance to estimate remaining classes, recovery requirements, safe skips, attendance health, leave impact and personalized planning advice.</p></div>
+</section>
+
+<section class="panel">
+  <div class="controls">
+    <div class="field"><label>Class section</label><select id="sec"></select></div>
+    <div class="field"><label>Attendance calculated until</label><input type="date" id="today"></div>
+    <div class="field"><label>Preferred planning date</label><input type="date" id="plan"></div>
+  </div>
+  <label class="check"><input type="checkbox" id="incl"> Today's classes are already included in my attendance percentage.</label><div style="margin-top:12px"><button class="btn" id="refreshBtn" type="button">Calculate Attendance</button></div>
+</section>
+
+<section class="overview">
+  <div class="ov primary"><small>Classes remaining</small><strong id="remainingStat">—</strong><p>All scheduled periods across the selected section</p><div class="progress"><span id="semesterProgress"></span></div></div>
+  <div class="ov"><small>Planning date</small><strong id="planStat">—</strong><p>Selected future date</p></div>
+  <div class="ov"><small>Minimum / safe target</small><strong>75% / 90%</strong><p>Danger threshold and safe target</p></div>
+</section>
+
+<div class="section-title"><div><h2>Your attendance</h2><p>Enter the current percentage for each subject.</p></div></div>
+<section class="panel"><div class="input-grid" id="inputs"></div></section>
+<div class="alert" id="alert"></div>
+
+<div class="section-title"><div><h2>Attendance forecast</h2><p>Recovery requirements are calculated from the timetable and your current percentage.</p></div></div>
+<section class="cards" id="out"></section>
+
+<div class="section-title"><div><h2>Attendance health</h2><p>Visual overview of your current subject-wise status.</p></div></div>
+<section class="analytics">
+  <div class="chart"><h3>Subject attendance</h3><div class="chart-sub">Current percentage versus the 75% minimum</div><div id="bars"></div></div>
+  <div class="chart"><h3>Health distribution</h3><div class="chart-sub">Subjects grouped by current attendance</div>
+    <div class="donut-wrap"><div class="donut" id="donut"></div><div class="legend2" id="dlegend"></div></div>
+  </div>
+</section>
+
+<div class="section-title"><div><h2>OD / Medical Leave Simulator</h2><p>Estimate how a leave period changes the selected subject's final attendance.</p></div></div>
+<section class="panel">
+  <div class="simulator">
+    <div class="field"><label>Subject</label><select id="leaveSub"></select></div>
+    <div class="field"><label>Leave start</label><input type="date" id="leaveStart"></div>
+    <div class="field"><label>Calendar days</label><input type="number" id="leaveDays" min="1" max="60" value="1"></div>
+    <div class="field"><label>Leave type</label><select id="leaveMode"><option value="exempt">OD / Medical — excluded from denominator</option><option value="attended">OD — counted as attended</option></select></div>
+    <button class="btn" id="simulate">Simulate</button>
+  </div>
+  <div class="sim-result" id="simResult"></div>
+</section>
+
+<div class="note">
+  <strong>Calculation notes:</strong> Semester window is <strong>29 Aug 2026 – 29 Nov 2026</strong>. Scheduled classes are counted Monday–Friday using the embedded section timetables; weekends and the configured holiday dates are excluded. Because the user enters only a percentage, attended classes are estimated as <em>current percentage × classes already held</em>. For exact institutional records, replace the percentage input with official attended/held counts.
+</div>
+</main>
+
+<footer>Attendance Predictor • Unified Phase 1 + Phase 2 dashboard</footer>
+
+<button class="chat-fab" id="chatFab" aria-label="Open Attendance Advisor">✦</button>
+<section class="chat" id="chat">
+  <div class="chat-head"><div><strong>Attendance Advisor</strong><small>Personalized timetable-based guidance</small></div><button class="chat-close" id="chatClose">×</button></div>
+  <div class="messages" id="messages"></div>
+  <form class="chat-input" id="chatForm"><input id="chatText" placeholder="e.g. If I take a 3-day sick leave..." autocomplete="off"><button class="btn" type="submit">Send</button></form>
+</section>
+</div>
+
+<!-- ================= FREE CLASS LOCATOR ================= -->
+<div id="L" hidden>
+<header><h1>Free Class Locator</h1><p>Find a quiet room nobody will walk in on.</p></header>
+<main>
+ <div class="ask"><input id="q" placeholder="Ask anything, e.g. quiet room on the 3rd floor for 5 people tomorrow at 2pm for 2 hours" aria-label="Describe the room you need">
+ <button id="go">Find room</button></div>
+ <div class="chips" id="chips"></div>
+ <div id="result" class="result" hidden></div>
+ <div class="controls">
+  <label>Day<select id="day"></select></label>
+  <label>Time<input type="time" id="time"></label>
+  <button id="now">Use current time</button>
+ </div>
+ <div id="sum" class="sum"></div>
+
+ <div class="seg" role="group" aria-label="Choose view"><button id="vmap" aria-pressed="true">3D map</button><button id="vlist" aria-pressed="false">Normal list</button></div>
+ <div class="chips" id="fchips" aria-label="Choose floor"></div>
+ <div class="mapwrap" id="mapwrap">
+  <div class="stage" id="stage" aria-label="3D building map">
+   <div class="legend"><span><i style="background:var(--free)"></i>Free</span><span><i style="background:var(--soon)"></i>Under 1 h</span><span><i style="background:var(--busy)"></i>In class</span></div>
+   <div id="bld"></div>
+   <div class="tools"><button id="rl" aria-label="Rotate left">⟲ Rotate left</button><button id="rr" aria-label="Rotate right">Rotate right ⟳</button><button id="rreset" aria-label="Reset view">Reset</button><label style="flex-direction:row;align-items:center;gap:6px">Tilt <input type="range" id="tilt" min="20" max="80" value="45"></label></div>
+  </div>
+  <div class="panel" id="panel"></div>
+ </div>
+
+ <div id="floors"></div>
+ <p class="note">Use the switch above to pick the 3D map (live countdown and Call the Squad) or the normal list. Classes run 9:00 AM – 4:50 PM. Floor and seat values are placeholders in ROOMS.</p>
+</main>
+</div>
+
+<script>
+/* ===== Tabs ===== */
+(function(){
+  const tabs=document.querySelectorAll('.hub-tabs button');
+  function show(id){
+    tabs.forEach(b=>b.setAttribute('aria-selected',b.dataset.t===id));
+    document.getElementById('A').hidden=id!=='A';
+    document.getElementById('L').hidden=id!=='L';
+    history.replaceState(null,'','#'+(id==='L'?'free':'attendance'));
+    window.scrollTo(0,0);
+    if(id==='L')window.dispatchEvent(new Event('resize')); // re-fit the 3D map
+  }
+  tabs.forEach(b=>b.onclick=()=>show(b.dataset.t));
+  show(location.hash==='#free'?'L':'A');
+})();
+</script>
+
+<script>
+/* ===== Attendance Predictor logic (isolated) ===== */
+(function(){
+const START='2026-08-29', END='2026-11-29';
+const HOL={
+ '2026-09-04':'Krishna Jayanthi','2026-09-14':'Vinayagar Chathurthi','2026-10-02':'Gandhi Jayanthi',
+ '2026-10-19':'Ayudha Pooja','2026-10-20':'Vijayadasami','2026-11-08':'Deepavali'
+};
+
+const N_BME2={A:'Transforms & Boundary Value Problems',B:'Biomedical Signals & Systems',C:'Electric & Electronic Circuits',D:'Digital Logic for Medical Systems',E:'Medical Physics',F:'Professional Ethics',G:'Universal Human Values-II',H:'Verbal Reasoning',I:'Social Engineering',L:'DLMS / EEC Lab'};
+const N_DS2={A:'Transforms & Boundary Value Problems',B:'Solid State Devices',C:'Computer Organization & Architecture',D:'Digital Logic Design',E:'EM Theory & Interference',F:'Professional Ethics',G:'Universal Human Values-II',H:'Verbal Reasoning',I:'Social Engineering',L:'Devices & Digital IC Lab'};
+const N_BME3={A:'Probability & Statistics',B:'Microcontrollers & Application in Medicine',C:'Biomedical Signal Processing',D:'Biometrics',E:'Modern Wireless Communication',F:'Principles of Medical Imaging',G:'Analytical & Logical Thinking Skills',H:'Indian Art Form',I:'Community Connect',L:'MPMC Lab',M:'Bio DSP Lab'};
+const N_ECE3={A:'Discrete Mathematics',B:'Microprocessor, Microcontroller & Interfacing',C:'VLSI Design & Technology',D:'System & Network on Chip',E:'Machine Learning for All',F:'Community Connect',G:'Analytical & Logical Thinking Skills',H:'Indian Art Form',L:'VLSI / Microprocessor Lab'};
+const N_DS3={...N_ECE3,D:'Machine Learning for All',E:'Database Design & Management'};
+const N_ECE4={A:'Behavioural Psychology',B:'Wireless Communication & Antenna Systems',C:'Computer Communication & Network Security',D:'Semiconductor Memory Design',E:'Scripting Language for EDA',F:'Machine Learning for All',L:'CCNS Lab'};
+
+// The first-year PDF in the supplied dataset is an older 2024-25 timetable.
+const N_ECE1={A:'Advanced Calculus and Complex Analysis',B:'Chemistry',C:'Electronic System and PCB Design',D:'Programming for Problem Solving',E:'Philosophy of Engineering',F:'Biology',G:'German',N:'NSS',W:'Basic Civil and Mechanical Workshop'};
+const SECS={
+ 'I ECE-A':{n:N_ECE1,g:['EEBA.BBFC','CBA DWWWW'.replaceAll(' ',''),'BED..DDCC','.GGA.CCNN','DACB.FGGG']},
+ 'II BME':{n:N_BME2,g:['ECII.LL..','CEBA.HH..','BDA..HG..','AEBD...LL','FACD...GG']},
+ 'II ECE DS-A':{n:N_DS2,g:['EAII.GGLL','CAED.G.HH','ABCD..H..','BCAF.LL..','DBEC.....']},
+ 'II ECE DS-B':{n:N_DS2,g:['..LL.DBCI','LL...CDEA','G....IEAD','GGHH.ACBE','H....FABC']},
+ 'III BME':{n:N_BME3,g:['GGLL.EBFH','MMG..CDAB','.....CAFD','...I.ACEB','I....FADE']},
+ 'III ECE-A':{n:N_ECE3,g:['EBBA.GG..','HDBB..G..','CADF...LL','AECF.....','DAEC.LL..']},
+ 'III ECE-B':{n:N_ECE3,g:['LL...EBAD','GG...FBDC','G....BBAH','LL...ACEF','.....CAED']},
+ 'III ECE-DS':{n:N_DS3,g:['EBCA.....','CBDF.LL..','HBAC...GG','ADEF.....','DAEB.G.LL']},
+ 'IV ECE-A':{n:N_ECE4,g:['C.AD.....','CDBF.....','BLEF.....','FAEB.....','CADE.....']},
+ 'IV ECE-B':{n:N_ECE4,g:['CAEF.....','CEFB.....','CDAB.....','DBLA.....','EDF......']}
+};
+
+const DAY=864e5, $=id=>document.getElementById(id);
+const P=s=>{const[a,b,c]=s.split('-').map(Number);return Date.UTC(a,b-1,c)};
+const F=ms=>new Date(ms).toISOString().slice(0,10);
+const fmt=ms=>new Date(ms).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+const S0=P(START),E0=P(END);
+const clampDate=(d,a,b)=>Math.max(a,Math.min(b,d));
+
+function count(sec,from,to){
+  const r={}; from=Math.max(from,S0); to=Math.min(to,E0);
+  for(let d=from;d<=to;d+=DAY){
+    const wd=new Date(d).getUTCDay(); if(wd<1||wd>5||HOL[F(d)])continue;
+    for(const ch of SECS[sec].g[wd-1]||'') if(ch!=='.') r[ch]=(r[ch]||0)+1;
+  }
+  return r;
+}
+function subjects(sec){return [...new Set(SECS[sec].g.join('').replace(/\./g,''))].sort()}
+function todayLocal(){const n=new Date();return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10)}
+Object.keys(SECS).forEach(k=>$('sec').add(new Option(k,k)));
+
+$('today').value=todayLocal();
+$('plan').value=F(Math.min(P(todayLocal())+7*DAY,E0));
+$('leaveStart').value=todayLocal();
+
+let latest={};
+
+function buildInputs(){
+  const sec=$('sec').value, old={};
+  $('inputs').querySelectorAll('input').forEach(i=>old[i.dataset.k]=i.value);
+  $('inputs').innerHTML=subjects(sec).map(k=>`<div class="subject-input"><label>${SECS[sec].n[k]}</label><input type="number" min="0" max="100" step=".1" id="s${k}" data-k="${k}" placeholder="Attendance %"></div>`).join('');
+  $('inputs').querySelectorAll('input').forEach(i=>{if(old[i.dataset.k]!==undefined)i.value=old[i.dataset.k];i.oninput=run});
+  $('leaveSub').innerHTML=subjects(sec).map(k=>`<option value="${k}">${SECS[sec].n[k]}</option>`).join('');
+  run();
+}
+function needFor(target,H,T,a){return Math.max(0,Math.ceil(target*T-a-1e-9))}
+function run(){
+  const sec=$('sec').value; const todayRaw=P($('today').value||todayLocal()); const today=Number.isFinite(todayRaw)?todayRaw:P(todayLocal()); const planRaw=P($('plan').value||$('today').value||todayLocal()); const plan=clampDate(Number.isFinite(planRaw)?planRaw:today,today,E0);
+  const safeToday = Number.isFinite(today) ? today : P(todayLocal()); const heldEnd=$('incl').checked?safeToday:safeToday-DAY, remStart=heldEnd+DAY;
+  const held=count(sec,S0,heldEnd), rem=count(sec,remStart,E0), remPlan=count(sec,remStart,plan), all=count(sec,S0,E0);
+  const totalAll=Object.values(all).reduce((a,b)=>a+b,0), remAll=Object.values(rem).reduce((a,b)=>a+b,0);
+  $('remainingStat').textContent=remAll;
+  $('planStat').textContent=fmt(plan).replace(/\s2026/,'');
+  $('semesterProgress').style.width=Math.min(100,totalAll?((totalAll-remAll)/totalAll)*100:0)+'%';
+
+  let html='', doomed=[], rows=[], dist={red:0,orange:0,green:0};
+  for(const k of subjects(sec)){
+    const input=$('s'+k); if(!input)continue; const v=input.value;if(v==='')continue;
+    const p=Math.max(0,Math.min(100,parseFloat(v))),H=held[k]||0,R=rem[k]||0,Rp=remPlan[k]||0,T=H+R,a=p/100*H;
+    const n75=needFor(.75,H,T,a),n90=needFor(.90,H,T,a);
+    const maxFinal=T?(a+R)/T*100:p, doom=H>0&&maxFinal<75-1e-9;
+    const nPlan=needFor(.75,H,H+Rp,a),skipPlan=Math.max(0,Rp-nPlan);
+    const projP=(H+Rp)?(a+Rp)/(H+Rp)*100:p;
+    const minPlan=(H+Rp)?a/(H+Rp)*100:p;
+    let tag,col,soft;
+    if(doom){tag='IRREVERSIBLE DETENTION';col='var(--red)';soft='#fff0f1';doomed.push(SECS[sec].n[k]);dist.red++}
+    else if(p<75){tag='BELOW 75%';col='var(--red)';soft='#fff0f1';dist.red++}
+    else if(p<90){tag='SAFE • BELOW 90%';col='var(--orange)';soft='#fff5dc';dist.orange++}
+    else{tag='EXCELLENT • 90%+';col='var(--green)';soft='#e8f8f2';dist.green++}
+    rows.push({k,name:SECS[sec].n[k],p,col});
+    const t75=n75>R?'Not reachable':n75===0?'Already safe':`${n75} / ${R}`;
+    const t90=n90>R?'Not reachable':n90===0?'Already there':`${n90} / ${R}`;
+    html+=`<article class="card ${doom||p<75?'bad':''}">
+      <div class="card-head"><div><h3>${SECS[sec].n[k]}</h3><span class="tag" style="color:${col};background:${soft}">${tag}</span></div><div class="code">${k}</div></div>
+      <div class="meter"><div class="circle" style="background:conic-gradient(${col} ${p}%,#edf0f6 ${p}% )"><b>${p.toFixed(1)}%</b></div>
+      <div class="meter-info"><small><span>Current</span><span>75% / 90%</span></small><div class="track"><div class="fill" style="width:${p}%;background:${col}"></div><i class="threshold t75"></i><i class="threshold t90"></i></div></div></div>
+      <div class="details">
+        <div class="detail"><span>Classes held</span><b>${H}</b></div><div class="detail"><span>Classes remaining</span><b>${R}</b></div>
+        <div class="detail"><span>To reach 75%</span><b>${t75}</b></div><div class="detail"><span>Can skip after 75%</span><b>${n75>R?'—':R-n75}</b></div>
+        <div class="detail"><span>To reach 90%</span><b>${t90}</b></div><div class="detail"><span>Until plan date</span><b>${Rp} classes</b></div>
+      </div>
+      <div class="plan"><b>Planning insight:</b> You can skip <b>${skipPlan}</b> scheduled classes before ${fmt(plan)} while maintaining 75%, assuming no other absences. Attendance on that date could range from <b>${minPlan.toFixed(1)}%</b> to <b>${projP.toFixed(1)}%</b>.</div>
+    </article>`;
+  }
+  $('out').innerHTML=html||`<div class="card" style="grid-column:1/-1;text-align:center;color:var(--muted)">Enter attendance percentages above to generate your forecast.</div>`;
+  $('alert').style.display=doomed.length?'block':'none';
+  if(doomed.length)$('alert').innerHTML=`<strong>⚠ Irreversible Detention</strong><small>Even attending every remaining scheduled class, these subjects cannot mathematically recover to 75% by the end of the semester: <b>${doomed.join(', ')}</b>.</small>`;
+
+  $('bars').innerHTML=rows.map(r=>`<div class="bar-row"><span title="${r.name}">${r.name.length>22?r.name.slice(0,22)+'…':r.name}</span><div class="bar"><i style="width:${r.p}%;background:${r.col}"></i></div><b>${r.p.toFixed(0)}%</b></div>`).join('')||'<div style="color:var(--muted);font-size:11px">Enter attendance to see chart.</div>';
+  const total=dist.red+dist.orange+dist.green, red=total?dist.red/total*100:0, orange=total?(dist.red+dist.orange)/total*100:0;
+  $('donut').style.background=`conic-gradient(var(--red) 0 ${red}%,var(--orange) ${red}% ${orange}%,var(--green) ${orange}% 100%)`;
+  $('dlegend').innerHTML=`<div><i class="dot" style="background:var(--red)"></i>Below 75%: <b>${dist.red}</b></div><div><i class="dot" style="background:var(--orange)"></i>75–89%: <b>${dist.orange}</b></div><div><i class="dot" style="background:var(--green)"></i>90%+: <b>${dist.green}</b></div>`;
+  latest={sec,today,plan,held,rem,remPlan,rows,dist};
+}
+function leaveClasses(sec,k,start,days){
+  const end=Math.min(P(END),P(start)+(days-1)*DAY), c=count(sec,P(start),end);
+  return c[k]||0;
+}
+$('simulate').onclick=()=>{
+  const sec=$('sec').value,k=$('leaveSub').value,start=$('leaveStart').value||todayLocal(),days=Math.max(1,parseInt($('leaveDays').value)||1),mode=$('leaveMode').value;
+  const H=latest.held?.[k]||0,p=(()=>{const inp=$('s'+k);return inp&&inp.value!==''?Math.max(0,Math.min(100,+inp.value)):null})();
+  if(p===null){$('simResult').style.display='block';$('simResult').innerHTML='Enter the current attendance percentage for this subject first.';return}
+  const classes=leaveClasses(sec,k,start,days),att=p/100*H;
+  let final,formula;
+  if(mode==='attended'){final=(H+classes)?(att+classes)/(H+classes)*100:p;formula=`${classes} scheduled class(es) are treated as attended.`}
+  else{final=(H-classes)>0?att/(H-classes)*100:p;formula=`${classes} scheduled class(es) are removed from the denominator.`}
+  $('simResult').style.display='block';
+  $('simResult').innerHTML=`<b>${SECS[sec].n[k]}</b>: ${classes} class(es) fall inside the ${days}-day leave window. ${formula}<br>Estimated attendance after leave: <b style="color:${final<75?'var(--red)':final<90?'var(--orange)':'var(--green)'}">${final.toFixed(1)}%</b> — ${final<75?'below the 75% danger threshold.':final<90?'above 75%, but below the 90% safe target.':'at or above 90%.'}`;
+};
+
+$('sec').onchange=buildInputs;$('today').onchange=run;$('plan').onchange=run;$('incl').onchange=run;$('refreshBtn').onclick=run;
+buildInputs();
+
+// Chatbot
+function addMsg(text,who){const d=document.createElement('div');d.className='msg '+who;d.textContent=text;$('messages').appendChild(d);$('messages').scrollTop=$('messages').scrollHeight}
+function advisor(q){
+  if(!latest.rows.length)return 'Please enter at least one subject attendance percentage first.';
+  const s=q.toLowerCase(),sec=latest.sec;
+  let k=subjects(sec).find(x=>s.includes(SECS[sec].n[x].toLowerCase()));
+  if(!k)k=subjects(sec).find(x=>new RegExp('\\b'+x.toLowerCase()+'\\b').test(s));
+  const current=k?latest.rows.find(r=>r.k===k):null;
+  let days=(s.match(/(\d+)\s*[- ]?\s*day/)||[])[1];
+  if(days){
+    days=parseInt(days);
+    const start=todayLocal();
+    if(s.includes('tomorrow')){const d=P(todayLocal())+DAY; $('leaveStart').value=F(d)}
+    else $('leaveStart').value=start;
+    if(k){
+      $('leaveSub').value=k;$('leaveDays').value=days;$('leaveMode').value='exempt';$('simulate').click();
+      const cls=leaveClasses(sec,k,$('leaveStart').value,days),H=latest.held[k]||0,p=current.p,att=p/100*H;
+      const final=(H-cls)>0?att/(H-cls)*100:p;
+      return `${SECS[sec].n[k]} is currently ${p.toFixed(1)}%. A ${days}-day leave window contains ${cls} scheduled class(es). If those classes are medically/OD exempted from the denominator, the estimate becomes ${final.toFixed(1)}%. ${final<75?'That crosses below 75%, so the leave is risky.':'That remains at or above 75%, but check the 90% target too.'}`;
+    }
+    return `I can simulate the ${days}-day leave, but I need the subject name in your question, for example: “If I take a 3-day sick leave for Chemistry, will I drop below 75%?”`;
+  }
+  if(k&&current){
+    const H=latest.held[k]||0,R=latest.rem[k]||0,a=current.p/100*H,T=H+R;
+    const n75=needFor(.75,H,T,a),n90=needFor(.90,H,T,a),max=T?(a+R)/T*100:current.p;
+    return `${SECS[sec].n[k]} is at ${current.p.toFixed(1)}%. You need ${n75>R?'more than all remaining classes to reach 75%':n75===0?'no additional classes to reach 75%':n75+' of the '+R+' remaining classes'} for 75%. For 90%, ${n90>R?'90% is not reachable with the remaining timetable':n90===0?'you are already at 90%':n90+' classes must be attended'}. Even with perfect attendance, the semester-end estimate is ${max.toFixed(1)}%.`;
+  }
+  if(s.includes('overall')||s.includes('health')||s.includes('danger')){
+    const r=latest.rows,avg=r.reduce((a,x)=>a+x.p,0)/r.length;
+    return `Your dashboard currently has ${latest.dist.red} subject(s) below 75%, ${latest.dist.orange} between 75% and 89%, and ${latest.dist.green} at 90%+. The simple subject-average is ${avg.toFixed(1)}%; use the subject cards for the timetable-weighted recovery plan.`;
+  }
+  return `I can answer questions about 75% recovery, 90% targets, remaining classes, safe skips and leave simulations. Try: “How many classes do I need for Chemistry?” or “If I take a 3-day sick leave for Chemistry, will I fall below 75%?”`;
+}
+$('chatFab').onclick=()=>{$('chat').classList.add('open');if(!$('messages').children.length)addMsg('Hi! I can read this dashboard and calculate recovery or leave scenarios for you.','bot');$('chatText').focus()};
+$('chatClose').onclick=()=>$('chat').classList.remove('open');
+$('chatForm').onsubmit=e=>{e.preventDefault();const q=$('chatText').value.trim();if(!q)return;addMsg(q,'user');$('chatText').value='';setTimeout(()=>addMsg(advisor(q),'bot'),120)};
+})();
+</script>
+
+<script>
+/* ===== Free Class Locator logic (isolated) ===== */
+(function(){
+const ROOMS = [
+  {id:"IST 108", floor:1, cap:60},
+  {id:"IST 201", floor:2, cap:60},
+  {id:"TB 106", floor:1, cap:80},
+  {id:"Lab 107", floor:1, cap:30},
+  {id:"Lab 309", floor:3, cap:30},
+  {id:"IST 416", floor:4, cap:60},
+  {id:"IST 510", floor:5, cap:60},
+  {id:"IST 602", floor:6, cap:60},
+  {id:"IST 710", floor:7, cap:60},
+];
+const BOOKINGS = [
+  ["IST 416",1,"09:00","12:30","II ECE-DS A"],["IST 416",2,"09:00","12:30","II ECE-DS A"],
+  ["IST 416",3,"09:00","12:30","II ECE-DS A"],["IST 416",4,"09:00","12:30","II ECE-DS A"],
+  ["IST 416",5,"09:00","12:30","II ECE-DS A"],
+  ["IST 602",1,"13:20","15:00","II ECE-DS A"],["IST 602",2,"13:20","14:10","II ECE-DS A"],
+  ["TB 106",2,"15:10","16:50","II ECE-DS A"],["TB 106",3,"14:10","15:00","II ECE-DS A"],
+  ["Lab 309",1,"15:10","16:50","II ECE-DS A"],["Lab 309",4,"13:20","15:00","II ECE-DS A"],
+  ["IST 602",1,"09:00","12:35","I ECE-A"],["IST 602",2,"09:00","12:35","I ECE-A"],
+  ["IST 602",3,"09:00","11:40","I ECE-A"],["IST 602",4,"09:00","09:55","I ECE-A"],
+  ["IST 602",5,"09:00","12:35","I ECE-A"],
+  ["IST 710",1,"15:20","16:50","I ECE-A"],["IST 510",4,"14:25","16:50","I ECE-A"],
+  ["IST 108",3,"15:20","16:50","I ECE-A"],["IST 201",4,"15:20","16:50","I ECE-A"],
+];
+const DAY_START="09:00", DAY_END="16:50";
+
+const $=s=>document.querySelector(s), DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const toM=t=>{const[h,m]=t.split(":").map(Number);return h*60+m}, toT=m=>String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+const to12=m=>{const h=Math.floor(m/60),x=m%60;return (h%12||12)+":"+String(x).padStart(2,"0")+" "+(h<12?"AM":"PM")};
+const fl=f=>f===0?"Ground floor":["","1st","2nd","3rd"][f]?["","1st","2nd","3rd"][f]+" floor":f+"th floor";
+function status(r,day,t){
+  const bs=BOOKINGS.filter(b=>b[0]===r.id&&b[1]===day).map(b=>[toM(b[2]),toM(b[3]),b[4]]).sort((a,b)=>a[0]-b[0]);
+  const cur=bs.find(b=>t>=b[0]&&t<b[1]); if(cur)return{free:false,until:cur[1],sec:cur[2]};
+  const nx=bs.find(b=>b[0]>t); return{free:true,until:nx?nx[0]:toM(DAY_END),next:!!nx};
+}
+let fsel=null, view="map", match=null, sel=null, rz=-35, base=0, t0=Date.now();
+const claimed=new Set(), claimKey=()=>sel+"|"+$("#day").value;
+function sync(){base=toM($("#time").value||"10:00")*60;t0=Date.now()}
+const nowSec=()=>base+(Date.now()-t0)/1000;
+
+function render(){
+  const day=+$("#day").value,t=toM($("#time").value||"10:00"),S=toM(DAY_START),E=toM(DAY_END),off=t<S||t>=E,W=E-S;
+  const by={};let nf=0,tot=0;ROOMS.forEach(r=>(by[r.floor]??=[]).push(r));
+  const fk=Object.keys(by).sort((a,b)=>a-b);
+  const cls=r=>{const s=status(r,day,t);return{s,c:off||!s.free?"busy":s.until-t<=60?"soon":""}};
+  $("#floors").innerHTML=fk.map(f=>`<section class="floor"><h3>${fl(+f)}</h3><div class="grid">`+
+   by[f].map(r=>{const{s,c}=cls(r),m=s.until-t;tot++;if(s.free&&!off)nf++;
+    const bs=BOOKINGS.filter(b=>b[0]===r.id&&b[1]===day).sort((a,b)=>a[2]<b[2]?-1:1),mc=match?(match.has(r.id)?" hit":" dim"):"";
+    return `<div class="room ${c}${mc}" data-id="${r.id}"><b>${r.id}</b><small>seats ${r.cap}</small>
+    <div class="st">${off?"Classes over":s.free?`Free until ${toT(s.until)}`:`In class until ${toT(s.until)}`}</div>
+    <div class="tl">${bs.map(b=>`<u style="left:${(toM(b[2])-S)/W*100}%;width:${(toM(b[3])-toM(b[2]))/W*100}%"></u>`).join("")}${off?"":`<s style="left:${(t-S)/W*100}%"></s>`}</div>
+    <div class="det">${bs.length?bs.map(b=>`${b[2]}–${b[3]} ${b[4]}`).join("<br>"):"No classes this day."}</div></div>`}).join("")+`</div></section>`).join("");
+  $("#sum").innerHTML=off?`<span class="none">Outside class hours (9:00 AM – 4:50 PM)</span>`:`<b>${nf}</b> of ${tot} rooms free at ${toT(t)}`;
+  const mk=fsel===null?fk:fk.filter(f=>+f===fsel),n=mk.length,gap=90;
+  $("#fchips").innerHTML=`<button class="fc" data-f="all" aria-pressed="${fsel===null}">All floors</button>`+fk.map(f=>{const c=by[f].filter(r=>!off&&status(r,day,t).free).length;
+   return `<button class="fc" data-f="${f}" aria-pressed="${fsel===+f}">${fl(+f)} · ${c} free</button>`}).join("");
+  $("#bld").innerHTML=mk.map((f,i)=>`<div class="slab" style="transform:translateZ(${(i-(n-1)/2)*gap}px)"><span class="fl">${fl(+f)}</span>`+
+   by[f].map(r=>{const{s,c}=cls(r),mc=match?(match.has(r.id)?"":" dim"):"";
+    const bs=BOOKINGS.filter(b=>b[0]===r.id&&b[1]===day);
+    return `<div class="t ${c}${mc}${sel===r.id?" sel":""}" data-id="${r.id}" tabindex="0" role="button" aria-label="${r.id}, ${fl(r.floor)}, ${off||!s.free?"in class":"free"}"><b>${r.id}</b><small>${fl(r.floor)} · seats ${r.cap}</small>
+    <div class="st">${off?"Classes over":s.free?`Free until ${toT(s.until)}`:`In class until ${toT(s.until)}`}</div>
+    <div class="tl">${bs.map(b=>`<u style="left:${(toM(b[2])-S)/W*100}%;width:${(toM(b[3])-toM(b[2]))/W*100}%"></u>`).join("")}${off?"":`<s style="left:${(t-S)/W*100}%"></s>`}</div></div>`}).join("")+`</div>`).join("");
+  place();panel();
+}
+function place(){
+  const w=$("#stage").clientWidth||540,sc=Math.min(fsel===null?1:1.5,w/540);
+  $("#bld").style.transform=`scale(${sc}) rotateX(${$("#tilt").value}deg) rotateZ(${rz}deg)`;
+}
+function panel(){
+  const p=$("#panel"),r=ROOMS.find(x=>x.id===sel);
+  if(!r){p.innerHTML=`<h2>Pick a room</h2><p class="empty">Click any block on the map to see how long until its next class, then claim it and call your squad.</p>`;return}
+  const day=+$("#day").value,cur=nowSec(),m=Math.floor(cur/60),S=toM(DAY_START),E=toM(DAY_END);
+  const off=m<S||m>=E,s=status(r,day,m),left=Math.max(0,Math.round(s.until*60-cur));
+  const hh=Math.floor(left/3600),mm=String(Math.floor(left%3600/60)).padStart(2,"0"),ss=String(left%60).padStart(2,"0");
+  const clk=(hh?hh+":":"")+mm+":"+ss, k=claimKey(), mine=claimed.has(k)&&s.free&&!off;
+  const tone=off||!s.free?"busy":left<=3600?"soon":"free";
+  const label=off?"Classes are over for today":s.free?(s.next?"until the next class starts":"until classes end for the day"):`until ${s.sec} class ends`;
+  const msg=`📍 Heading to ${r.id}. It's free until ${to12(s.until)}. Come fast!`;
+  if(!p.dataset.id||p.dataset.id!==r.id+"|"+mine+"|"+off+s.free){
+    p.dataset.id=r.id+"|"+mine+"|"+off+s.free;
+    p.innerHTML=`<h2>${r.id}</h2><div class="sub">${fl(r.floor)} · seats ${r.cap}</div>
+    <div class="cd ${tone}" id="cdv"></div><div class="cdl" id="cdl"></div>
+    <div class="acts">${off||!s.free?`<span class="empty">Not available to claim right now.</span>`:
+     mine?`<a class="wa" id="wa" target="_blank" rel="noopener">📣 Call the Squad</a><button id="unclaim" style="background:var(--card);color:var(--ink);border:1px solid var(--line)">Release room</button>`
+     :`<button id="claim">Claim this room</button>`}</div>`;
+  }
+  $("#cdv").textContent=clk;$("#cdv").className="cd "+tone;$("#cdl").textContent=label;
+  const wa=$("#wa");if(wa)wa.href="https://wa.me/?text="+encodeURIComponent(msg);
+}
+function setView(v){view=v;$("#mapwrap").hidden=$("#fchips").hidden=v!=="map";$("#vmap").setAttribute("aria-pressed",v==="map");$("#vlist").setAttribute("aria-pressed",v==="list");if(v==="map")place()}
+$("#vmap").onclick=()=>setView("map");$("#vlist").onclick=()=>setView("list");
+function select(id){sel=id;$("#panel").dataset.id="";render()}
+const FULLD=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+const lev=(a,b)=>{const d=Array.from({length:a.length+1},(_,i)=>[i]);for(let j=1;j<=b.length;j++)d[0][j]=j;
+  for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length]};
+function dayOf(q){
+  const dn=new Date().getDay();
+  if(/day after tomorrow/.test(q))return (dn+2)%7;
+  if(/tomorrow|tmrw|tommorow|tomorow/.test(q))return (dn+1)%7;
+  if(/\btod(ay|ya)\b/.test(q))return dn;
+  for(const w of q.match(/[a-z]{3,}/g)||[])for(let i=0;i<7;i++){const f=FULLD[i];
+    if(w===f||f.startsWith(w)||(w.length>=5&&lev(w,f)<=(w.length<7?1:2)))return i}
+}
+const clock=(h,m,ap)=>{h=+h;m=+(m||0);if(ap==="pm"&&h<12)h+=12;if(ap==="am"&&h===12)h=0;if(!ap&&h>=1&&h<8)h+=12;return h*60+m};
+function parse(q){
+  q=q.toLowerCase().replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/g,w=>({one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10})[w]);
+  const p={};let m=q.match(/\b(ist|tb|lab)\s*-?\s*(\d{2,3})\b/);if(m)p.room=m[1]+" "+m[2];
+  if(!m&&/\blabs?\b/.test(q))p.kind="lab";else if(/class\s*room|lecture/.test(q))p.kind="class";
+  if(/\b(ground|gf)\b/.test(q))p.floor=0;
+  else if(/top\s*floor|highest/.test(q))p.floor=Math.max(...ROOMS.map(r=>r.floor));
+  else{m=q.match(/(\d+)\s*(?:st|nd|rd|th)?\s*(?:floor|level)|(?:floor|level)\s*(\d+)|(first|second|third|fourth|fifth|sixth|seventh)\s*(?:floor|level)/);
+    if(m)p.floor=m[3]?["","first","second","third","fourth","fifth","sixth","seventh"].indexOf(m[3]):+(m[1]||m[2]);}
+  m=q.match(/(?:team|group) of (\d+)|(\d+)\s*(?:people|persons|students|members|friends|of us|seats?)|\bfor\s+(\d+)\b(?!\s*(?::|am|pm|h|hr|min|hour|st|nd|rd|th))/);
+  if(m)p.size=+(m[1]||m[2]||m[3]);
+  if(/half an hour|half hour/.test(q))p.dur=30;
+  else if(/hour and a half/.test(q))p.dur=90;
+  else if(m=q.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/))p.dur=+m[1]*60;
+  else if(m=q.match(/(\d+)\s*(?:minutes?|mins?)\b/))p.dur=+m[1];
+  else if(/\ban hour\b/.test(q))p.dur=60;
+  const T="(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?";
+  const r=q.match(new RegExp("(?:from|between)\\s+"+T+"\\s*(?:to|-|till|until|and)\\s*"+T))||q.match(new RegExp("\\b(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)\\s*(?:to|-|till|until)\\s*"+T));
+  if(r){p.start=clock(r[1],r[2],r[3]);p.end=clock(r[4],r[5],r[6]);if(p.end<=p.start)delete p.end}
+  else{m=q.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?/)||q.match(/\b(\d{1,2})()\s*(am|pm)\b/)||q.match(/\b(?:at|around|after|by)\s+(\d{1,2})()()\b(?!\s*(?:h|hr|min|hour|people|st|nd|rd|th))/);
+    if(m)p.start=clock(m[1],m[2],m[3]);
+    else if(/\bnow\b/.test(q)){}
+    else if(/morning/.test(q))p.start=540;else if(/noon|lunch/.test(q))p.start=750;
+    else if(/afternoon/.test(q))p.start=780;else if(/evening/.test(q))p.start=960;}
+  const d=dayOf(q);if(d!==undefined)p.day=d;
+  return p;
+}
+function find(){
+  const raw=$("#q").value.trim();if(!raw)return;const p=parse(raw),now=new Date();
+  const S=toM(DAY_START),E=toM(DAY_END),nowM=now.getHours()*60+now.getMinutes();
+  const day=p.day??(now.getDay()||1);
+  const start=p.start??(p.day!==undefined&&p.day!==now.getDay()?S:nowM),end=p.end??(start+(p.dur??60)),dur=end-start;
+  const stat=r=>start>=E||day===0?{free:true,until:1440}:status(r,day,start);
+  const pool=ROOMS.filter(r=>(!p.room||r.id.toLowerCase()===p.room)&&(p.floor===undefined||r.floor===p.floor)&&(!p.size||r.cap>=p.size)&&(!p.kind||(p.kind==="lab")===r.id.startsWith("Lab")));
+  const ok=pool.map(r=>({r,s:stat(r)})).filter(x=>x.s.free);
+  const hits=ok.filter(x=>x.s.until>=end), near=ok.filter(x=>x.s.until<end).sort((a,b)=>b.s.until-a.s.until).slice(0,3);
+  const pill=h=>`<span class="pill" data-id="${h.r.id}" style="cursor:pointer"><b>${h.r.id}</b> · ${fl(h.r.floor)} · ${h.s.until>=1440?"free all day":"free till "+toT(h.s.until)}</span>`;
+  const tags=[p.room&&p.room.toUpperCase(),p.kind==="lab"?"labs":p.kind&&"classrooms",p.floor!==undefined&&fl(p.floor),p.size&&`${p.size}+ seats`,`${dur/60>=1?+(dur/60).toFixed(1)+" h":dur+" min"}`,`${DAYS[day]} ${toT(start)}–${toT(Math.min(end,1439))}`].filter(Boolean).join(" · ");
+  const el=$("#result");el.hidden=false;match=new Set(hits.map(x=>x.r.id));$("#day").value=day;$("#time").value=toT(Math.min(start,1439));sync();render();
+  el.innerHTML=`<h2>${tags}</h2>`+(hits.length?hits.map(pill).join(""):
+   `<div class="none">No room matches all of that.${end>E&&day!==0?" Classes end at 4:50 PM, so longer windows can't be fully checked.":""}</div>`+
+   (near.length?`<div style="margin:8px 0 4px;color:var(--mute)">Closest options (free for less time):</div>`+near.map(pill).join(""):`<div style="color:var(--mute)">${pool.length?"Every matching room is in class then.":"No room fits those filters. Try another floor or fewer seats."}</div>`))+
+   `<a class="clr" style="color:var(--acc);cursor:pointer;text-decoration:underline;margin-left:4px">clear highlight</a>`;
+}
+$("#day").innerHTML=[1,2,3,4,5,6,0].map(i=>`<option value="${i}">${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][i]}</option>`).join("");
+function setNow(){const n=new Date();$("#day").value=n.getDay()||1;$("#time").value=toT(n.getHours()*60+n.getMinutes());sync()}
+["day","time"].forEach(i=>$("#"+i).addEventListener("input",()=>{match=null;$("#result").hidden=true;sync();$("#panel").dataset.id="";render()}));
+$("#now").onclick=()=>{match=null;$("#result").hidden=true;setNow();render()};
+$("#L").addEventListener("click",e=>{
+  const g=id=>e.target.closest(id);
+  if(g(".clr")){match=null;$("#result").hidden=true;render();return}
+  if(g("#claim")){claimed.add(claimKey());$("#panel").dataset.id="";panel();return}
+  if(g("#unclaim")){claimed.delete(claimKey());$("#panel").dataset.id="";panel();return}
+  const fc=g(".fc");if(fc){fsel=fc.dataset.f==="all"?null:+fc.dataset.f;render();return}
+  const c=g(".room");if(c){c.classList.toggle("open");if(view==="map")select(c.dataset.id);return}
+  const t=g(".t")||g(".pill[data-id]");if(t&&view==="map")select(t.dataset.id)});
+$("#L").addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.classList?.contains("t")){e.preventDefault();select(e.target.dataset.id)}});
+let hold=null;const turn=d=>{rz+=d;place()};
+[["#rl",-15],["#rr",15]].forEach(([id,d])=>{const b=$(id);
+  b.addEventListener("pointerdown",e=>{e.preventDefault();turn(d);hold=setInterval(()=>turn(d/3),50)});
+  ["pointerup","pointerleave","pointercancel"].forEach(ev=>b.addEventListener(ev,()=>{clearInterval(hold)}))});
+$("#rreset").onclick=()=>{rz=-35;place()};
+$("#tilt").addEventListener("input",place);addEventListener("resize",place);
+setInterval(()=>{
+  const m=Math.floor(nowSec()/60);
+  if(m<1440&&m!==toM($("#time").value||"00:00")){$("#time").value=toT(m);render()}else panel();
+},1000);
+$("#go").onclick=find;$("#q").addEventListener("keydown",e=>e.key==="Enter"&&find());
+["room on the 1st floor for the next 2 hours","room on the 6th floor for 1 hour","room for 40 students at 2pm Tue for 90 min","lab free from 3 to 4:30 on friday","is IST 416 free tomorrow morning?"].forEach(s=>{
+  const b=document.createElement("button");b.textContent=s;b.onclick=()=>{$("#q").value=s;find()};$("#chips").append(b)});
+setNow();if(new Date().getDay()===0){$("#day").value=1}render();
+})();
+</script>
+</body>
+</html>
